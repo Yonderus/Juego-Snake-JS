@@ -1,0 +1,40 @@
+/* Fondo oscuro y todo centrado en la página */
+body {
+    background-color: #1e1e1e;
+    color: #f0f0f0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 20px;
+}
+
+#Resultados p {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+/* Sin esto, cada celda tiene su propio borde y se ven líneas dobles */
+#tabla {
+    border-collapse: collapse;
+    border: 2px solid #888; /* marco exterior del tablero */
+}
+
+/* Las celdas están vacías, así que hay que darles tamaño fijo o medirían 0 */
+#tabla td {
+    width: 25px;
+    height: 25px;
+    padding: 0;
+    border: 1px solid #333;
+    background-color: #2b2b2b;
+}
+
+/* Clases para más adelante: JS las añadirá y quitará con classList */
+#tabla td.snake {
+    background-color: #4caf50;
+}
+
+#tabla td.comida {
+    background-color: #e53935;
+}
