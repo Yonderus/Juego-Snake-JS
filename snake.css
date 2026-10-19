@@ -1,40 +1,291 @@
-/* Fondo oscuro y todo centrado en la página */
+/* ===== Estilo retro: consola portátil de los 90 ===== */
+
+/* Fuente pixelada de Google Fonts (necesita conexión a internet) */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* Variables: cambiando estos colores cambias todo el tema */
+:root {
+    --pantalla: #9bbc0f;        /* verde claro de la pantalla LCD */
+    --pixel-oscuro: #0f380f;    /* snake y textos de la pantalla */
+    --pixel-medio: #306230;     /* comida */
+    --carcasa: #c9c5bd;         /* plástico gris de la consola */
+    --carcasa-sombra: #9a958c;
+    --marco: #565a6b;           /* marco oscuro alrededor de la pantalla */
+    --botones: #9b1c4f;         /* botones A y B */
+    --marca: #2a3082;           /* texto azul de la carcasa */
+    --fondo: #1b1b2f;
+}
+
 body {
-    background-color: #1e1e1e;
-    color: #f0f0f0;
-    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 24px 16px;
+    min-height: 100vh;
+    box-sizing: border-box;
+    background: radial-gradient(circle at top, #2d2d4a, var(--fondo));
+    font-family: 'Press Start 2P', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ---------- Carcasa ---------- */
+
+#tableroJuego {
+    position: relative;
+    width: 340px;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 24px 22px 70px;
+    background: linear-gradient(160deg, #d6d2ca, var(--carcasa));
+    border-radius: 16px 16px 64px 16px;   /* esquina inferior derecha redondeada */
+    box-shadow:
+        inset -6px -6px 0 var(--carcasa-sombra),
+        inset 3px 3px 0 rgba(255, 255, 255, 0.5),
+        0 24px 48px rgba(0, 0, 0, 0.6);
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 0;
-    padding: 20px;
 }
 
+/* ---------- Marco y pantalla ---------- */
+
+.marco-pantalla {
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 18px 20px;
+    background: var(--marco);
+    border-radius: 10px 10px 36px 10px;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Piloto de encendido */
+.led {
+    position: absolute;
+    left: 7px;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ff3b3b;
+    box-shadow: 0 0 6px 2px rgba(255, 59, 59, 0.7);
+}
+
+/* Marcador, en el marco encima de la pantalla */
 #Resultados p {
-    font-size: 18px;
-    font-weight: bold;
+    margin: 0;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #c8c8d0;
 }
 
-/* Sin esto, cada celda tiene su propio borde y se ven líneas dobles */
+#longitudCountSnake {
+    color: #fff;
+}
+
+/* Contenedor de la pantalla: relative para poder colocar el mensaje encima */
+.pantalla {
+    position: relative;
+    line-height: 0;
+}
+
 #tabla {
     border-collapse: collapse;
-    border: 2px solid #888; /* marco exterior del tablero */
+    background: var(--pantalla);
+    box-shadow: inset 0 0 12px rgba(15, 56, 15, 0.35);
 }
 
-/* Las celdas están vacías, así que hay que darles tamaño fijo o medirían 0 */
+/* Celdas: rejilla casi invisible, como los píxeles de una LCD */
 #tabla td {
-    width: 25px;
-    height: 25px;
+    width: 24px;
+    height: 24px;
     padding: 0;
-    border: 1px solid #333;
-    background-color: #2b2b2b;
+    border: 1px solid rgba(15, 56, 15, 0.07);
+    background: var(--pantalla);
 }
 
-/* Clases para más adelante: JS las añadirá y quitará con classList */
+/* Snake: bloque oscuro con un pequeño margen interior para que se vea pixelado */
 #tabla td.snake {
-    background-color: #4caf50;
+    background: var(--pixel-oscuro);
+    box-shadow: inset 0 0 0 2px var(--pantalla);
 }
 
+/* Comida: cuadrado pequeño centrado (el borde interior grueso lo "encoge") */
 #tabla td.comida {
-    background-color: #e53935;
+    background: var(--pixel-medio);
+    box-shadow: inset 0 0 0 7px var(--pantalla);
+}
+
+/* ---------- Mensaje de fin de partida ---------- */
+
+/* Se coloca encima de la pantalla ocupándola entera */
+#mensajeTerminado {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 22px;
+    line-height: 1.6;
+    letter-spacing: 2px;
+    color: var(--pixel-oscuro);
+    background: rgba(155, 188, 15, 0.82);
+    animation: parpadeo 1s steps(2, start) infinite;
+}
+
+/* IMPORTANTE: al darle display: flex, el atributo hidden deja de ocultarlo,
+   así que hay que volver a decirle que se oculte cuando tenga hidden */
+#mensajeTerminado[hidden] {
+    display: none;
+}
+
+/* Parpadeo a saltos, como en las pantallas antiguas */
+@keyframes parpadeo {
+    to { visibility: hidden; }
+}
+
+/* ---------- Texto de la carcasa ---------- */
+
+.marca {
+    align-self: flex-start;
+    margin: 12px 0 0 4px;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--marca);
+}
+
+/* ---------- Controles decorativos ---------- */
+
+.controles {
+    width: 100%;
+    margin-top: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Cruceta: dos barras cruzadas */
+.cruceta {
+    position: relative;
+    width: 78px;
+    height: 78px;
+    margin-left: 6px;
+}
+
+.cruceta::before,
+.cruceta::after {
+    content: "";
+    position: absolute;
+    background: #2b2b2b;
+    border-radius: 4px;
+    box-shadow: 0 3px 0 #111;
+}
+
+.cruceta::before {   /* barra vertical */
+    left: 26px;
+    top: 0;
+    width: 26px;
+    height: 78px;
+}
+
+.cruceta::after {    /* barra horizontal */
+    left: 0;
+    top: 26px;
+    width: 78px;
+    height: 26px;
+}
+
+/* Botones A y B, inclinados */
+.botones-ab {
+    display: flex;
+    gap: 14px;
+    margin-right: 6px;
+    transform: rotate(-25deg);
+}
+
+.boton-redondo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--botones);
+    box-shadow: 0 3px 0 #5e0f2f, inset 0 2px 2px rgba(255, 255, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- Botón de reiniciar (estilo START) ---------- */
+
+.botones-menu {
+    margin-top: 26px;
+    display: flex;
+    justify-content: center;
+}
+
+.boton-pastilla {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transform: rotate(-25deg);
+}
+
+#reiniciar {
+    width: 56px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 10px;
+    background: #7d7a74;
+    box-shadow: 0 3px 0 #55524d, inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: transform 0.05s, box-shadow 0.05s;
+}
+
+#reiniciar:hover {
+    background: #8c8983;
+}
+
+/* Al pulsarlo, se "hunde" */
+#reiniciar:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 #55524d;
+}
+
+/* Contorno visible al llegar con el tabulador */
+#reiniciar:focus-visible {
+    outline: 2px solid var(--marca);
+    outline-offset: 3px;
+}
+
+.boton-pastilla span {
+    font-size: 8px;
+    color: var(--marca);
+}
+
+/* ---------- Rejilla del altavoz ---------- */
+
+.altavoz {
+    position: absolute;
+    right: 26px;
+    bottom: 26px;
+    display: flex;
+    gap: 6px;
+    transform: rotate(-25deg);
+}
+
+.altavoz span {
+    width: 5px;
+    height: 38px;
+    border-radius: 3px;
+    background: var(--carcasa-sombra);
+    box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.35);
 }

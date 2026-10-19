@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,14 +7,47 @@
     <title>Juego Snake</title>
 </head>
 <body>
-    <div id="Resultados">
-        <p id="longitudSnake">Total de longitud: <span id="longitudCountSnake">1</span></p>
-    </div>
-
+    <!-- Carcasa de la consola -->
     <div id="tableroJuego">
-        <table id="tabla">
 
-        </table>
+        <!-- Marco oscuro que rodea la pantalla -->
+        <div class="marco-pantalla">
+            <span class="led" aria-hidden="true"></span>
+
+            <div id="Resultados">
+                <p id="longitudSnake">LONGITUD: <span id="longitudCountSnake">1</span></p>
+            </div>
+
+            <!-- Pantalla: el tablero y, encima, el mensaje de fin de partida -->
+            <div class="pantalla">
+                <table id="tabla"></table>
+                <p id="mensajeTerminado" hidden>GAME<br>OVER</p>
+            </div>
+        </div>
+
+        <p class="marca">SNAKE</p>
+
+        <!-- Controles decorativos: cruceta y botones A/B -->
+        <div class="controles" aria-hidden="true">
+            <div class="cruceta"></div>
+            <div class="botones-ab">
+                <span class="boton-redondo">B</span>
+                <span class="boton-redondo">A</span>
+            </div>
+        </div>
+
+        <!-- Botón de reiniciar con forma de botón START -->
+        <div class="botones-menu">
+            <div class="boton-pastilla">
+                <button id="reiniciar" aria-label="Reiniciar" onclick="restartJuego()"></button>
+                <span>REINICIAR</span>
+            </div>
+        </div>
+
+        <!-- Rejilla del altavoz (decorativa) -->
+        <div class="altavoz" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
     </div>
 
     <script src="snake.js"></script>
