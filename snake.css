@@ -134,6 +134,7 @@ body {
     font-size: 22px;
     line-height: 1.6;
     letter-spacing: 2px;
+    white-space: pre-line;      /* respeta los saltos de línea (\n) del texto */
     color: var(--pixel-oscuro);
     background: rgba(155, 188, 15, 0.82);
     animation: parpadeo 1s steps(2, start) infinite;

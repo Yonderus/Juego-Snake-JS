@@ -2,14 +2,14 @@
 
 /* ÍNDICE
 1. Referencias al HTML
-2. Configuración del tablero
+2. Configuración
 3. Estado del juego
 4. Tablero
 5. Utilidades
 6. Comida
 7. Snake
 8. Teclado
-9. Fin y reinicio del juego (pendiente)
+9. Fin y reinicio del juego
 10. Inicio del juego
 
 El archivo sigue este orden: primero las constantes y variables (secciones 1 a 3), después todas las funciones
@@ -22,20 +22,28 @@ las llamadas, todas las variables y funciones ya están declaradas. */
 /* Guardamos en constantes los elementos del HTML que vamos a usar desde JS:
 - tabla: la <table id="tabla"> vacía del HTML, donde JS creará las filas y celdas del tablero.
 - longitud: el <span id="longitudCountSnake"> del marcador, donde escribiremos la longitud del snake.
+- mensajeTerminado: el <p id="mensajeTerminado"> donde se muestra "GAME OVER" (o la victoria).
+  Empieza oculto con el atributo hidden y terminarJuego lo muestra.
+- botonReiniciar: el <button id="reiniciar"> que llama a reiniciarJuego al hacer clic.
 Son const porque siempre apuntan al mismo elemento: lo que cambia es su contenido, no la referencia. */
 
 const tabla = document.getElementById("tabla");
 const longitud = document.getElementById("longitudCountSnake");
+const mensajeTerminado = document.getElementById("mensajeTerminado");
+const botonReiniciar = document.getElementById("reiniciar");
 
 
-/* ==================== 2. CONFIGURACIÓN DEL TABLERO ==================== */
+/* ==================== 2. CONFIGURACIÓN ==================== */
 
 /* Número de filas y columnas. Van en mayúsculas por convención, para indicar que son valores de configuración
 que no cambian durante la partida. Todo el código usa estas constantes en lugar de números escritos a mano,
-así que para cambiar el tamaño del tablero basta con modificarlas aquí. Con 11x11 hay una celda central exacta. */
+así que para cambiar el tamaño del tablero basta con modificarlas aquí. Con 11x11 hay una celda central exacta.
+VELOCIDAD es cada cuántos milisegundos avanza el snake: cuanto más bajo, más rápido. Se usa al arrancar
+el intervalo en reiniciarJuego. */
 
 const FILAS = 11;
 const COLUMNAS = 11;
+const VELOCIDAD = 200;
 
 
 /* ==================== 3. ESTADO DEL JUEGO ==================== */
@@ -52,33 +60,39 @@ const celdas = [];
 /* SNAKE
 snake es un array de objetos {x, y}: cada objeto es un trozo de la serpiente.
 snake[0] es siempre la cabeza y el último elemento es la cola.
-Empieza con un solo trozo en el centro, calculado a partir de FILAS y COLUMNAS (Math.floor(11 / 2) = 5)
-para que siga centrado aunque cambie el tamaño del tablero.
-Es const porque el array nunca se reasigna: se modifica con unshift y pop. */
+Empieza vacío: reiniciarJuego le mete el primer trozo en el centro, tanto al cargar la página como al reiniciar.
+Es const porque el array nunca se reasigna: se modifica con unshift, pop, push y vaciándolo con length = 0.
+Su longitud (snake.length) es también la que se muestra en el marcador, así no hace falta un contador aparte. */
 
-const snake = [{y: Math.floor(FILAS / 2), x: Math.floor(COLUMNAS / 2)}];
+const snake = [];
 
 /* COMIDA
 comida es un objeto con la posición de la comida en coordenadas de celda: x (columna) e y (fila).
-Es let porque generarComida le asigna un objeto nuevo cada vez que el snake come.
-Nota: esta posición inicial se genera sin comprobar si coincide con el snake. */
+Empieza en {x: 0, y: 0} solo para que tenga un valor: reiniciarJuego le da su posición real con generarComida.
+Es let porque generarComida le asigna un objeto nuevo cada vez que el snake come. */
 
-let comida = {y: posicionComida(FILAS), x: posicionComida(COLUMNAS)};
+let comida = {x: 0, y: 0};
 
 /* DIRECCIÓN
 direccion indica cuánto se suma a la x y a la y de la cabeza en cada paso:
 derecha {x: 1, y: 0}, izquierda {x: -1, y: 0}, abajo {x: 0, y: 1}, arriba {x: 0, y: -1} (la y crece hacia abajo).
-Empieza en {x: 0, y: 0}: sumar 0 no mueve la cabeza, así que el snake espera quieto hasta la primera flecha.
+Vale {x: 0, y: 0} al empezar: sumar 0 no mueve la cabeza, así que el snake espera quieto hasta la primera flecha.
 Es global para que pulsarTecla la pueda cambiar y moverSnake la pueda leer: las dos funciones
 se comunican a través de esta variable, sin llamarse entre ellas. */
 
 let direccion = {x: 0, y: 0};
 
-/* LONGITUD
-Contador de la longitud del snake para el marcador. Empieza en 1 porque el snake empieza con un solo trozo.
-Es let porque se incrementa cada vez que el snake come. */
+/* INTERVALO
+Guarda el identificador que devuelve setInterval, para poder pararlo después con clearInterval.
+Es let porque cada vez que se reinicia el juego se crea un intervalo nuevo y se guarda aquí. */
 
-let longituds = 1;
+let intervalo;
+
+/* JUEGO TERMINADO
+Vale true después de perder (o ganar). pulsarTecla lo consulta para ignorar las flechas cuando la partida ha acabado,
+y reiniciarJuego lo vuelve a poner a false. */
+
+let juegoTerminado = false;
 
 
 /* ==================== 4. TABLERO ==================== */
@@ -88,7 +102,8 @@ let longituds = 1;
 - El bucle de dentro (col) se ejecuta COLUMNAS veces por cada fila: crea un <td>, lo mete en el <tr> y guarda su referencia en celdas[fila].
 - Al terminar cada fila, el <tr> completo se mete en la tabla.
 createElement crea el elemento en memoria y appendChild lo coloca dentro de su padre. appendChild no copia el elemento, lo mueve,
-por eso hay que crear un <tr> nuevo en cada fila y un <td> nuevo en cada columna. */
+por eso hay que crear un <tr> nuevo en cada fila y un <td> nuevo en cada columna.
+Solo se llama una vez al cargar la página: al reiniciar no se vuelve a crear el tablero, solo se limpia. */
 
 function tableroJuego() {
     for (let fila = 0; fila < FILAS; fila++) {
@@ -114,29 +129,38 @@ function tableroJuego() {
 
 /* ==================== 5. UTILIDADES ==================== */
 
-/* La función posicionComida devuelve un número entero aleatorio entre 0 y p - 1.
-Math.random() da un decimal entre 0 y 0,999..., al multiplicarlo por p queda entre 0 y casi p, y Math.floor lo redondea hacia abajo.
-No se suma 1 porque los índices de la matriz empiezan en 0.
-Ej: con p = 11 devuelve un número del 0 al 10. Se usa con COLUMNAS para la x y con FILAS para la y.
-Se puede usar en la sección 3, antes de aparecer en el archivo, porque las funciones declaradas con "function"
-se elevan al principio del archivo (hoisting). Con las variables const o let no pasa. */
+/* numeroAleatorio devuelve un número entero aleatorio entre 0 y max - 1.
+Math.random() da un decimal entre 0 y 0,999..., al multiplicarlo por max queda entre 0 y casi max,
+y Math.floor lo redondea hacia abajo. No se suma 1 porque los índices de la matriz empiezan en 0.
+Ej: con max = 11 devuelve un número del 0 al 10. Se usa con COLUMNAS para la x y con FILAS para la y. */
 
-function posicionComida(p) {
-    return Math.floor(Math.random() * p);
+function numeroAleatorio(max) {
+    return Math.floor(Math.random() * max);
 }
 
-/* estaEnSnake devuelve true si la posición p coincide con algún trozo del snake, y false si no.
+/* estaEnSnake devuelve true si la posición coincide con algún trozo del snake, y false si no.
 Recorre todos los trozos comparando x con x e y con y. En cuanto encuentra una coincidencia devuelve true y deja de buscar.
 El return false va fuera del bucle porque solo se puede asegurar que no está después de revisar todos los trozos.
-Se usa en generarComida para no poner la comida encima del snake. */
+Se usa en dos sitios: en generarComida, para no poner la comida encima del snake,
+y en moverSnake, para saber si la nueva cabeza choca con el cuerpo. */
 
-function estaEnSnake(p) {
+function estaEnSnake(posicion) {
     for (const trozo of snake) {
-        if (p.x === trozo.x && p.y === trozo.y) {
+        if (posicion.x === trozo.x && posicion.y === trozo.y) {
             return true;
         }
     }
     return false;
+}
+
+/* chocaConPared devuelve true si la posición se sale del tablero, y false si está dentro.
+Los índices válidos van de 0 a COLUMNAS - 1 para la x y de 0 a FILAS - 1 para la y,
+así que se sale si es menor que 0 o mayor o igual que el número de columnas/filas.
+Basta con que se cumpla una de las cuatro condiciones, por eso se unen con ||.
+Se puede devolver directamente la condición porque ya es true o false. */
+
+function chocaConPared(posicion) {
+    return posicion.x < 0 || posicion.x >= COLUMNAS || posicion.y < 0 || posicion.y >= FILAS;
 }
 
 
@@ -160,185 +184,226 @@ function borrarComida() {
 
 /* generarComida busca una posición libre para la comida nueva. Usamos un do...while porque hay que generar
 al menos una posición antes de poder comprobarla:
-1. Genera una posición aleatoria y la asigna a comida.
-2. Si estaEnSnake dice que esa posición está ocupada por el snake, vuelve a empezar.
-El bucle termina en cuanto sale una posición libre, así que comida acaba siempre en una celda vacía.
-(La variable nueva es intermedia: se podría generar directamente en comida.)
-Si algún día el snake ocupara todo el tablero, nunca saldría una posición libre y el bucle no terminaría. */
+1. Genera una posición aleatoria en nueva.
+2. Si estaEnSnake dice que esa posición está ocupada por el snake, vuelve a generar otra.
+3. Cuando sale una posición libre, el bucle termina y se guarda en comida.
+nueva se declara fuera del do porque el while (que está fuera de las llaves) también la necesita.
+Importante: si el snake ocupara todo el tablero no habría ninguna posición libre y el bucle no terminaría nunca.
+Por eso moverSnake comprueba la victoria ANTES de llamar a generarComida. */
 
 function generarComida() {
     let nueva;
     do {
-        nueva = {y: posicionComida(FILAS), x: posicionComida(COLUMNAS)};
-        comida = nueva;
-    } while (estaEnSnake(comida));
+        nueva = {x: numeroAleatorio(COLUMNAS), y: numeroAleatorio(FILAS)};
+    } while (estaEnSnake(nueva));
+
+    comida = nueva;
 }
 
 
 /* ==================== 7. SNAKE ==================== */
 
 /* dibujarSnake recorre todos los trozos del snake con for...of y, para cada uno, busca su celda en la matriz
-y le añade la clase "snake". En cada vuelta, la variable celda contiene un trozo (un objeto {x, y}), no un <td>:
-el <td> es celdaSnake. */
+y le añade la clase "snake". En cada vuelta, la variable trozo es un objeto {x, y}; el <td> es celdaSnake. */
 
 function dibujarSnake() {
-    for (const celda of snake) {
-        const celdaSnake = celdas[celda.y][celda.x];
+    for (const trozo of snake) {
+        const celdaSnake = celdas[trozo.y][trozo.x];
         celdaSnake.classList.add("snake");
     }
 }
 
 /* borrarSnake hace lo contrario que dibujarSnake: quita la clase "snake" de las celdas de todos los trozos.
-Se llama al principio de moverSnake, cuando el array todavía tiene las posiciones antiguas, para no dejar rastro. */
+Hay que llamarla mientras el array todavía tiene las posiciones antiguas, para borrar el dibujo viejo. */
 
 function borrarSnake() {
-    for (const celda of snake) {
-        const celdaSnake = celdas[celda.y][celda.x];
+    for (const trozo of snake) {
+        const celdaSnake = celdas[trozo.y][trozo.x];
         celdaSnake.classList.remove("snake");
     }
 }
 
-/* moverSnake hace avanzar el snake una celda. La llama el setInterval cada 200 ms.
-1. Borra el dibujo actual del snake (con las posiciones antiguas).
-2. Coge la cabeza actual (snake[0]) y calcula la nueva cabeza sumándole la dirección.
-   Es un objeto nuevo: la cabeza antigua no se modifica.
-3. Añade la nueva cabeza al principio del array con unshift. Se hace antes de comprobar la comida para que,
-   si hay que generar comida nueva, estaEnSnake ya tenga en cuenta la cabeza nueva.
-4. Si la nueva cabeza está en la misma posición que la comida (se compara x con x e y con y,
-   porque dos objetos distintos nunca son iguales con ===):
-   - borra la comida antigua, genera una posición nueva libre y la dibuja,
-   - suma 1 a la longitud y actualiza el marcador,
+/* moverSnake hace avanzar el snake una celda. La llama el setInterval cada VELOCIDAD milisegundos.
+0. Si la dirección es {x: 0, y: 0} el snake está quieto (todavía no se ha pulsado ninguna flecha) y no hace nada.
+   Sin esto, la nueva cabeza coincidiría con la cabeza actual y se detectaría como un choque.
+1. Calcula la nueva cabeza sumando la dirección a la cabeza actual (snake[0]). Es un objeto nuevo.
+2. Comprueba los choques ANTES de mover nada, para que al perder el snake siga dibujado tal como estaba:
+   - con una pared (chocaConPared),
+   - con su propio cuerpo (estaEnSnake). Se comprueba antes del unshift: si la nueva cabeza ya estuviera
+     en el array, estaEnSnake siempre la encontraría.
+   Si choca, termina el juego y sale con return.
+3. Borra el dibujo del snake (con las posiciones antiguas).
+4. Añade la nueva cabeza al principio del array con unshift.
+5. Si la nueva cabeza pisa la comida (se compara x con x e y con y, porque dos objetos distintos nunca son iguales con ===):
+   - borra la comida y actualiza el marcador con la nueva longitud,
+   - si el snake ya ocupa todo el tablero, ha ganado: lo dibuja, termina el juego y sale,
+   - si no, genera comida nueva en una celda libre y la dibuja,
    - y NO quita la cola: así el snake crece un trozo.
    Si no ha comido, quita la cola con pop y el snake avanza manteniendo su longitud.
-5. Dibuja el snake con las posiciones nuevas.
+6. Dibuja el snake con las posiciones nuevas.
 Con unshift + pop se mueve todo el snake sin mover cada trozo: aparece uno delante y desaparece uno detrás. */
 
-    function moverSnake() {
-    
-        if (direccion.x === 0 && direccion.y === 0) {
-          return  
-        }
-
-        // 2. Cabeza actual
-        const cabeza = snake[0];
-        //    Nueva posición de la cabeza = cabeza actual + dirección
-        const nuevaCabeza = {y: cabeza.y + direccion.y, x: cabeza.x + direccion.x};
-
-        for (const trozo of snake) {
-            if (trozo.x === nuevaCabeza.x && trozo.y === nuevaCabeza.y) {
-                //intervalo = clearInterval(moverSnake, 0);
-                terminarJuego();
-                return true;       
-            }
-        }
-
-        // 1. Borrar el dibujo con las posiciones antiguas
-        borrarSnake();
-    
-        // 3. La nueva cabeza pasa a ser el primer trozo
-        snake.unshift(nuevaCabeza);
-
-        // 4. ¿La nueva cabeza pisa la comida?
-        if (nuevaCabeza.x === comida.x && nuevaCabeza.y === comida.y) {
-            borrarComida();
-            generarComida();
-            dibujarComida();
-
-            longituds++;
-            longitud.textContent = longituds;
-        } else {
-            //    No ha comido: quitamos la cola para mantener la longitud
-            snake.pop();
-        }
-
-        
-
-        // 5. Dibujar con las posiciones nuevas
-        dibujarSnake();
+function moverSnake() {
+    // 0. Si está quieto, no hay nada que mover
+    if (direccion.x === 0 && direccion.y === 0) {
+        return;
     }
+
+    // 1. Nueva posición de la cabeza = cabeza actual + dirección
+    const cabeza = snake[0];
+    const nuevaCabeza = {x: cabeza.x + direccion.x, y: cabeza.y + direccion.y};
+
+    // 2. ¿Choca con una pared o con su cuerpo? Fin de la partida
+    if (chocaConPared(nuevaCabeza) || estaEnSnake(nuevaCabeza)) {
+        terminarJuego("GAME\nOVER");
+        return;
+    }
+
+    // 3. Borrar el dibujo con las posiciones antiguas
+    borrarSnake();
+
+    // 4. La nueva cabeza pasa a ser el primer trozo
+    snake.unshift(nuevaCabeza);
+
+    // 5. ¿La nueva cabeza pisa la comida?
+    if (nuevaCabeza.x === comida.x && nuevaCabeza.y === comida.y) {
+        borrarComida();
+        longitud.textContent = snake.length;
+
+        // Si ya no queda ninguna celda libre, ha ganado
+        if (snake.length === FILAS * COLUMNAS) {
+            dibujarSnake();
+            terminarJuego("¡HAS\nGANADO!");
+            return;
+        }
+
+        generarComida();
+        dibujarComida();
+    } else {
+        //    No ha comido: quitamos la cola para mantener la longitud
+        snake.pop();
+    }
+
+    // 6. Dibujar con las posiciones nuevas
+    dibujarSnake();
+}
 
 
 /* ==================== 8. TECLADO ==================== */
 
 /* pulsarTecla se ejecuta cada vez que se pulsa una tecla (la engancha el addEventListener de la sección 10).
 El navegador le pasa el objeto event, y en event.key viene el nombre de la tecla pulsada.
-El switch compara event.key con las cuatro flechas. En cada caso:
-1. Si la flecha es la dirección contraria a la actual, sale de la función con return y no cambia nada.
-   Así se evita el giro de 180°, que haría que la cabeza chocara con su propio cuello.
-   Ej: si va a la derecha (x === 1) y se pulsa la izquierda, se ignora.
-2. Si no, asigna la nueva dirección.
-3. event.preventDefault() cancela la acción por defecto de las flechas (hacer scroll en la página).
-   Solo se llama en las flechas para no bloquear otras teclas como F5.
-   Nota: cuando se sale con return en el paso 1, no se llega a ejecutar el preventDefault.
-Cada case termina con break para que no se ejecuten también los case siguientes.
-Si la tecla no es una flecha, no coincide ningún case y direccion no cambia. */
+1. El switch solo traduce la flecha pulsada a una dirección y la guarda en nueva (todavía no la aplica).
+   Si la tecla no es una flecha, el default sale de la función sin hacer nada, así no se bloquean teclas como F5.
+2. event.preventDefault() cancela la acción por defecto de las flechas (hacer scroll en la página).
+3. Si la partida ha terminado, las flechas no hacen nada hasta que se reinicie.
+4. Calcula a qué celda iría la cabeza con la nueva dirección. Si esa celda es el cuello (snake[1]),
+   sería un giro de 180° y la cabeza chocaría consigo misma, así que se ignora la tecla.
+   Se compara con la posición real del cuello y no con la última tecla pulsada: así tampoco se cuela
+   el giro si se pulsan dos flechas muy rápido antes de que el snake se mueva.
+   snake.length > 1 va primero: si el snake mide 1, snake[1] no existe, y como esa parte ya da false,
+   JavaScript no llega a evaluar el resto de la condición (evaluación en cortocircuito).
+5. Si la dirección es válida, se aplica. */
 
 function pulsarTecla(event) {
+    // 1. Averiguamos qué dirección se ha pulsado (todavía no la aplicamos)
+    let nueva;
+
     switch (event.key) {
         case "ArrowUp":
-            if (direccion.y === 1) {
-                return;
-            }
-            direccion = {x: 0, y: -1};
-            event.preventDefault();
+            nueva = {x: 0, y: -1};
             break;
         case "ArrowDown":
-            if (direccion.y === -1) {
-                return;
-            }
-            direccion = {x: 0, y: 1};
-            event.preventDefault();
+            nueva = {x: 0, y: 1};
             break;
         case "ArrowRight":
-            if (direccion.x === -1) {
-                return;
-            }
-            direccion = {x: 1, y: 0};
-            event.preventDefault();
+            nueva = {x: 1, y: 0};
             break;
         case "ArrowLeft":
-            if (direccion.x === 1) {
-                return;
-            }
-            direccion = {x: -1, y: 0};
-            event.preventDefault();
+            nueva = {x: -1, y: 0};
             break;
+        default:
+            return;     // No es una flecha: salimos sin hacer nada
     }
 
-    // Muestra la dirección en la consola (para depurar, se puede quitar)
-    console.log(direccion);
+    // 2. Es una flecha: evitamos que la página haga scroll
+    event.preventDefault();
+
+    // 3. Si la partida ha terminado, ignoramos las flechas
+    if (juegoTerminado) {
+        return;
+    }
+
+    // 4. Calculamos a qué celda iría la cabeza y comprobamos que no sea el cuello
+    const cabeza = snake[0];
+    const destino = {x: cabeza.x + nueva.x, y: cabeza.y + nueva.y};
+
+    if (snake.length > 1 && destino.x === snake[1].x && destino.y === snake[1].y) {
+        return;
+    }
+
+    // 5. La dirección es válida: la aplicamos
+    direccion = nueva;
 }
 
 
-/* ==================== 9. FIN Y REINICIO DEL JUEGO (PENDIENTE) ==================== */
+/* ==================== 9. FIN Y REINICIO DEL JUEGO ==================== */
 
-/* PENDIENTE: terminarJuego deberá parar el intervalo, mostrar un mensaje de fin de partida
-e impedir que las flechas sigan cambiando la dirección. */
+/* terminarJuego se llama cuando el snake choca (con su cuerpo o con una pared) o cuando gana:
+1. Para el intervalo con clearInterval, así moverSnake deja de ejecutarse y el snake se queda quieto.
+2. Marca juegoTerminado como true para que pulsarTecla ignore las flechas.
+3. Escribe el texto recibido en el mensaje y lo muestra quitándole el atributo hidden.
+   El \n del texto es un salto de línea: el CSS del mensaje tiene white-space: pre-line para que se respete. */
 
-function terminarJuego() {
+function terminarJuego(texto) {
     clearInterval(intervalo);
+    juegoTerminado = true;
+    mensajeTerminado.textContent = texto;
+    mensajeTerminado.hidden = false;
 }
 
-/* PENDIENTE: restartJuego deberá devolver el juego al estado inicial: snake en el centro, dirección quieta,
-comida nueva, marcador a 1, tablero limpio y un único intervalo nuevo. */
+/* reiniciarJuego deja todo como al empezar una partida. Se usa al cargar la página y al pulsar el botón,
+así el código de "empezar partida" está en un solo sitio. El orden importa:
+1. Para el intervalo actual (por si se reinicia a mitad de partida y no acabar con dos intervalos a la vez).
+   Al cargar la página intervalo todavía no tiene valor, y clearInterval(undefined) simplemente no hace nada.
+2. Borra el dibujo del snake y de la comida MIENTRAS los datos todavía tienen las posiciones viejas.
+3. Vacía el array snake (length = 0) y le mete un trozo en el centro. No se reasigna porque es const.
+4. Deja la dirección quieta y quita la marca de juego terminado.
+5. Genera la comida DESPUÉS de resetear el snake, para que evite el snake nuevo y no el viejo.
+6. Pone el marcador con la longitud actual (1), oculta el mensaje y dibuja el snake y la comida.
+7. Quita el foco del botón: si no, después de hacer clic, pulsar espacio o Enter volvería a reiniciar.
+8. Arranca un intervalo nuevo y guarda su identificador en intervalo. */
 
-function restartJuego() {
-    snake = [{y: Math.floor(FILAS / 2), x: Math.floor(COLUMNAS / 2)}];
-    direccion = {x: 0, y: 0}
-    longituds = 1
-    
-}
+function reiniciarJuego() {
+    // 1. Parar el intervalo actual
+    clearInterval(intervalo);
 
-/* PENDIENTE: chocarPared deberá comprobar si una posición se sale del tablero. */
+    // 2. Borrar el dibujo de la partida anterior
+    borrarSnake();
+    borrarComida();
 
-function chocarPared() {
+    // 3. Snake de un solo trozo en el centro
+    snake.length = 0;
+    snake.push({x: Math.floor(COLUMNAS / 2), y: Math.floor(FILAS / 2)});
 
-}
+    // 4. Dirección quieta y partida en marcha
+    direccion = {x: 0, y: 0};
+    juegoTerminado = false;
 
-/* PENDIENTE: chocarSnake deberá comprobar si la nueva cabeza choca con el cuerpo del snake. */
+    // 5. Comida nueva en una celda libre
+    generarComida();
 
-function chocarSnake() {
+    // 6. Marcador, mensaje y dibujo
+    longitud.textContent = snake.length;
+    mensajeTerminado.hidden = true;
+    dibujarSnake();
+    dibujarComida();
 
+    // 7. Quitar el foco del botón
+    botonReiniciar.blur();
+
+    // 8. Arrancar el bucle del juego
+    intervalo = setInterval(moverSnake, VELOCIDAD);
 }
 
 
@@ -346,18 +411,16 @@ function chocarSnake() {
 
 /* Ponemos el juego en marcha, en este orden:
 1. Construimos el tablero (antes de dibujar nada, porque dibujar necesita que celdas tenga los <td>).
-2. Dibujamos la comida y el snake en su posición inicial.
-3. Enganchamos pulsarTecla al evento "keydown" de toda la página. "keydown" es un nombre fijo del navegador.
-   La función va sin paréntesis: no la llamamos nosotros, se la pasamos al navegador para que la llame él
-   cada vez que se pulse una tecla.
-4. Arrancamos el bucle del juego: setInterval llama a moverSnake cada 200 ms. Entre una llamada y otra
-   el navegador repinta la pantalla y atiende el teclado (por eso no se puede usar un while para esto).
-   Guardamos el identificador en intervalo para poder pararlo con clearInterval(intervalo) al terminar el juego. */
+2. Enganchamos pulsarTecla al evento "keydown" de toda la página y reiniciarJuego al clic del botón.
+   "keydown" y "click" son nombres fijos del navegador. Las funciones van sin paréntesis: no las llamamos
+   nosotros, se las pasamos al navegador para que las llame él cuando ocurra el evento.
+3. Llamamos a reiniciarJuego para preparar la primera partida: coloca el snake y la comida y arranca
+   el setInterval. Entre una llamada a moverSnake y otra, el navegador repinta la pantalla y atiende el teclado
+   (por eso no se puede usar un while para esto). */
 
 tableroJuego();
-dibujarComida();
-dibujarSnake();
 
 document.addEventListener("keydown", pulsarTecla);
+botonReiniciar.addEventListener("click", reiniciarJuego);
 
-const intervalo = setInterval(moverSnake, 200);
+reiniciarJuego();
